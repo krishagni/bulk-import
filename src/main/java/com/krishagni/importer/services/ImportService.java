@@ -11,6 +11,8 @@ import com.krishagni.importer.events.ObjectSchemaCriteria;
 import com.krishagni.importer.repository.ListImportJobsCriteria;
 
 public interface ImportService {
+	void setConfig(ImportConfig cfg);
+
 	List<ImportJobDetail> getImportJobs(ListImportJobsCriteria req);
 	
 	ImportJobDetail getImportJob(Long req);

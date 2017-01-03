@@ -43,7 +43,6 @@ import com.krishagni.commons.io.CsvFileReader;
 import com.krishagni.commons.io.CsvFileWriter;
 import com.krishagni.commons.io.CsvWriter;
 import com.krishagni.commons.io.ZipUtil;
-import com.krishagni.commons.util.MessageUtil;
 import com.krishagni.commons.util.Util;
 import com.krishagni.importer.domain.ImportJob;
 import com.krishagni.importer.domain.ImportJobErrorCode;
@@ -74,7 +73,7 @@ public class ImportServiceImpl implements ImportService {
 
 	private static Map<Long, ImportJob> runningJobs = new HashMap<>();
 
-	private ImportConfig cfg;
+	private ImportConfig config;
 
 	private ImportJobDao importJobDao;
 
@@ -92,8 +91,8 @@ public class ImportServiceImpl implements ImportService {
 
 	private SessionFactory sessionFactory;
 
-	public void setCfg(ImportConfig cfg) {
-		this.cfg = cfg;
+	public void setConfig(ImportConfig config) {
+		this.config = config;
 	}
 
 	public void setImportJobDao(ImportJobDao importJobDao) {
@@ -209,7 +208,7 @@ public class ImportServiceImpl implements ImportService {
 			//
 			// Ensure transaction size is well within configured limits
 			//
-			int inputRecordsCnt = CsvFileReader.getRowsCount(inputFile, true, cfg.getFieldSeparator());
+			int inputRecordsCnt = CsvFileReader.getRowsCount(inputFile, true, config.getFieldSeparator());
 			if (input.isAtomic() && inputRecordsCnt > getMaxRecsPerTxn()) {
 				return ImportJobDetail.txnSizeExceeded(inputRecordsCnt);
 			}
@@ -224,7 +223,7 @@ public class ImportServiceImpl implements ImportService {
 			moveToJobDir(inputFile, job.getId());
 
 			runningJobs.put(job.getId(), job);
-			taskExecutor.submit(new ImporterTask(cfg.getAuth(), job, input.getListener(), input.isAtomic()));
+			taskExecutor.submit(new ImporterTask(config.getAuth(), job, input.getListener(), input.isAtomic()));
 			return ImportJobDetail.from(job);
 		} catch (Exception e) {
 			if (job != null && job.getId() != null) {
@@ -294,7 +293,7 @@ public class ImportServiceImpl implements ImportService {
 			file = new File(getFilePath(detail.getFileId()));
 			reader = new ObjectReader(
 				file.getAbsolutePath(), schema,
-				cfg.getDateFmt(), cfg.getTimeFmt(), cfg.getFieldSeparator());
+				config.getDateFmt(), config.getTimeFmt(), config.getFieldSeparator());
 
 			List<Map<String, Object>> records = new ArrayList<>();
 			Map<String, Object> record = null;
@@ -355,7 +354,7 @@ public class ImportServiceImpl implements ImportService {
 	}
 
 	private int getMaxRecsPerTxn() {
-		return cfg.getAtomicitySize();
+		return config.getAtomicitySize();
 	}
 
 	private ImportJob getJob(Long jobId) {
@@ -368,7 +367,7 @@ public class ImportServiceImpl implements ImportService {
 	}
 
 	private ImportJob ensureAccess(ImportJob job) {
-		if (!cfg.isAccessAllowed().test(job)) {
+		if (!config.isAccessAllowed(job)) {
 			throw AppException.userError(ImportJobErrorCode.ACCESS_DENIED);
 		}
 
@@ -376,7 +375,7 @@ public class ImportServiceImpl implements ImportService {
 	}
 	
 	private String getDataDir() {
-		return cfg.getDataDir();
+		return config.getDataDir();
 	}
 	
 	private String getImportDir() {
@@ -434,7 +433,7 @@ public class ImportServiceImpl implements ImportService {
 		AppException ae = new AppException(ErrorType.USER_ERROR);
 
 		ImportJob job = new ImportJob();
-		job.setCreatedBy((IUser)cfg.getAuth().getPrincipal());
+		job.setCreatedBy((IUser) config.getAuth().getPrincipal());
 		job.setCreationTime(Calendar.getInstance().getTime());
 		job.setName(detail.getObjectType());
 		job.setStatus(ImportJob.Status.IN_PROGRESS);
@@ -461,7 +460,7 @@ public class ImportServiceImpl implements ImportService {
 	private void setDateAndTimeFormat(ImportDetail detail, ImportJob job, AppException ose) {
 		String dateFormat = detail.getDateFormat();
 		if (StringUtils.isBlank(dateFormat)) {
-			dateFormat = cfg.getDateFmt();
+			dateFormat = config.getDateFmt();
 		} else if (!Util.isValidDateFormat(dateFormat)) {
 			ose.addError(ImportJobErrorCode.INVALID_DATE_FORMAT, dateFormat);
 			return;
@@ -471,7 +470,7 @@ public class ImportServiceImpl implements ImportService {
 
 		String timeFormat = detail.getTimeFormat();
 		if (StringUtils.isBlank(timeFormat)) {
-			timeFormat = cfg.getTimeFmt();
+			timeFormat = config.getTimeFmt();
 		} else if (!Util.isValidDateFormat(dateFormat + " " + timeFormat)) {
 			ose.addError(ImportJobErrorCode.INVALID_TIME_FORMAT, timeFormat);
 			return;
@@ -498,6 +497,7 @@ public class ImportServiceImpl implements ImportService {
 			this.job = job;
 			this.callback = callback;
 			this.atomic = atomic;
+			job.setAtomic(atomic);
 		}
 
 		@Override
@@ -513,7 +513,7 @@ public class ImportServiceImpl implements ImportService {
 				csvWriter = getOutputCsvWriter(job);
 				objReader = new ObjectReader(
 					filePath, schema,
-					job.getDateFormat(), job.getTimeFormat(), cfg.getFieldSeparator());
+					job.getDateFormat(), job.getTimeFormat(), config.getFieldSeparator());
 
 				List<String> columnNames = objReader.getCsvColumnNames();
 				columnNames.add("OS_IMPORT_STATUS");
@@ -743,7 +743,7 @@ public class ImportServiceImpl implements ImportService {
 
 		private CsvWriter getOutputCsvWriter(ImportJob job)
 		throws IOException {
-			return CsvFileWriter.createCsvFileWriter(new FileWriter(getJobOutputFilePath(job.getId())), cfg.getFieldSeparator());
+			return CsvFileWriter.createCsvFileWriter(new FileWriter(getJobOutputFilePath(job.getId())), config.getFieldSeparator());
 		}
 				
 		private void closeQuietly(CsvWriter writer) {
@@ -757,6 +757,8 @@ public class ImportServiceImpl implements ImportService {
 		}
 
 		private void notifyJobStatus() {
+			config.onFinish(job);
+
 			if (callback == null) {
 				return;
 			}

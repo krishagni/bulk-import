@@ -48,6 +48,8 @@ public class ImportJob extends BaseEntity {
 	
 	private Date endTime;
 
+	private transient boolean atomic;
+
 	private transient volatile  boolean stopRunning;
 	
 	private Map<String, String> params = new HashMap<>();
@@ -146,6 +148,14 @@ public class ImportJob extends BaseEntity {
 
 	public void setParams(Map<String, String> params) {
 		this.params = params;
+	}
+
+	public boolean isAtomic() {
+		return atomic;
+	}
+
+	public void setAtomic(boolean atomic) {
+		this.atomic = atomic;
 	}
 
 	public boolean isAskedToStop() {

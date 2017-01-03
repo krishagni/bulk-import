@@ -5,7 +5,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-import com.krishagni.commons.domain.IUser;
+import com.krishagni.commons.events.UserInfo;
 import com.krishagni.importer.domain.ImportJob;
 
 public class ImportJobDetail {
@@ -21,7 +21,7 @@ public class ImportJobDetail {
 	
 	private Long failedRecords;
 	
-	private IUser createdBy;
+	private UserInfo createdBy;
 	
 	private Date creationTime;
 	
@@ -77,11 +77,11 @@ public class ImportJobDetail {
 		this.failedRecords = failedRecords;
 	}
 
-	public IUser getCreatedBy() {
+	public UserInfo getCreatedBy() {
 		return createdBy;
 	}
 
-	public void setCreatedBy(IUser createdBy) {
+	public void setCreatedBy(UserInfo createdBy) {
 		this.createdBy = createdBy;
 	}
 
@@ -115,7 +115,7 @@ public class ImportJobDetail {
 		detail.setName(job.getName());
 		detail.setType(job.getType().name());
 		detail.setStatus(job.getStatus().name());
-		detail.setCreatedBy(job.getCreatedBy());
+		detail.setCreatedBy(UserInfo.from(job.getCreatedBy()));
 		detail.setCreationTime(job.getCreationTime());
 		detail.setEndTime(job.getEndTime());
 		detail.setTotalRecords(job.getTotalRecords());

@@ -1,7 +1,5 @@
 package com.krishagni.importer.services;
 
-import java.util.function.Predicate;
-
 import org.springframework.security.core.Authentication;
 
 import com.krishagni.importer.domain.ImportJob;
@@ -9,7 +7,7 @@ import com.krishagni.importer.domain.ImportJob;
 public interface ImportConfig {
 	String getDataDir();
 
-	Predicate<ImportJob> isAccessAllowed();
+	boolean isAccessAllowed(ImportJob job);
 
 	String getDateFmt();
 

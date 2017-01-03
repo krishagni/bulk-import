@@ -43,7 +43,7 @@ public class ObjectSchemaFactoryImpl implements ObjectSchemaFactory {
 	
 	@Override
 	public ObjectSchema getSchema(String name) {
-		return getSchema(name, Collections.<String, String>emptyMap());
+		return getSchema(name, Collections.emptyMap());
 	}
 	
 	@Override
