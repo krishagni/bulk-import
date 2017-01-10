@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog 
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+  http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+  <changeSet id="Bulk import jobs" author="vpawar">
+    <createTable tableName="${hostAppDbPrefix}_BULK_IMPORT_JOBS">
+      <column name="IDENTIFIER" type="${int.type}" autoIncrement="${autoIncrement}">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="NAME" type="${text.type}(32)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="TYPE" type="${text.type}(16)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="STATUS" type="${text.type}(16)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="TOTAL_RECORDS" type="${int.type}"/>
+      <column name="FAILED_RECORDS" type="${int.type}"/>
+      <column name="CREATED_BY" type="${int.type}">
+        <constraints nullable="false"/>
+      </column>
+      <column name="CREATION_TIME" type="${timestamp.type}">
+        <constraints nullable="false"/>
+      </column>
+      <column name="END_TIME" type="${nullable.ts.type}"/>
+      <column name="DATE_FORMAT" type="${text.type}(16)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="TIME_FORMAT" type="${text.type}(8)">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="Bulk import job identifier sequence" author="vpawar" dbms="oracle">
+    <createSequence sequenceName="${hostAppDbPrefix}_BULK_IMPORT_JOBS_SEQ" startValue="1" incrementBy="1" ordered="true"/>
+  </changeSet>
+
+  <changeSet id="Foreign key on import job creator" author="vpawar">
+    <addForeignKeyConstraint constraintName="FK_IMPORT_JOB_CREATOR"
+      baseTableName="${hostAppDbPrefix}_BULK_IMPORT_JOBS" baseColumnNames="CREATED_BY"
+      referencedTableName="${hostAppUsersTable}" referencedColumnNames="IDENTIFIER"/>
+  </changeSet>
+
+  <changeSet id="Bulk import job parameters" author="vpawar">
+    <createTable tableName="${hostAppDbPrefix}_BULK_IMPORT_JOB_PARAMS">
+      <column name="JOB_ID" type="${int.type}">
+        <constraints nullable="false"/>
+      </column>
+      <column name="PARAM" type="${text.type}(32)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="VALUE" type="${text.type}(64)">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+  </changeSet>
+
+  <changeSet id="Foreign key on import params job" author="vpawar">
+    <addForeignKeyConstraint constraintName="FK_IMPORT_PARAMS_JOB"
+      baseTableName="${hostAppDbPrefix}_BULK_IMPORT_JOB_PARAMS" baseColumnNames="JOB_ID"
+      referencedTableName="${hostAppDbPrefix}_BULK_IMPORT_JOBS" referencedColumnNames="IDENTIFIER"/>
+  </changeSet>
+
+</databaseChangeLog>
