@@ -131,20 +131,16 @@ public class ImportServiceImpl implements ImportService {
 			List<ImportJob> jobs = importJobDao.getImportJobs(crit);
 			return ImportJobDetail.from(jobs);
 		} catch (Exception e) {
-			AppException.serverError(e);
+			return AppException.raiseError(e);
 		}
-
-		return null;
 	}
 
 	@Override
 	public ImportJobDetail getImportJob(Long jobId) {
 		try {
 			return ImportJobDetail.from(getJob(jobId));
-		} catch (AppException ae) {
-			throw ae;
 		} catch (Exception e) {
-			throw AppException.serverError(e);
+			return AppException.raiseError(e);
 		}
 	}
 	
@@ -158,10 +154,8 @@ public class ImportServiceImpl implements ImportService {
 			}
 
 			return file.getAbsolutePath();
-		} catch (AppException ae) {
-			throw ae;
 		} catch (Exception e) {
-			throw AppException.serverError(e);
+			return AppException.raiseError(e);
 		}
 	}
 		
@@ -189,7 +183,7 @@ public class ImportServiceImpl implements ImportService {
 			
 			return fileId;
 		} catch (Exception e) {
-			throw  AppException.serverError(e);
+			return AppException.raiseError(e);
 		} finally {
 			IOUtils.closeQuietly(out);
 		}
@@ -236,7 +230,7 @@ public class ImportServiceImpl implements ImportService {
 				throw AppException.userError(ImportJobErrorCode.RECORD_PARSE_ERROR, e.getLocalizedMessage());
 			}
 
-			throw AppException.serverError(e);
+			return AppException.raiseError(e);
 		}
 	}
 
@@ -245,7 +239,7 @@ public class ImportServiceImpl implements ImportService {
 		try {
 			ImportJob job = runningJobs.get(jobId);
 			if (job == null || !job.isInProgress()) {
-				AppException.userError(ImportJobErrorCode.NOT_IN_PROGRESS, jobId);
+				throw AppException.userError(ImportJobErrorCode.NOT_IN_PROGRESS, jobId);
 			}
 
 			ensureAccess(job).stop();
@@ -258,7 +252,7 @@ public class ImportServiceImpl implements ImportService {
 
 			return ImportJobDetail.from(job);
 		} catch (Exception e) {
-			throw AppException.serverError(e);
+			return AppException.raiseError(e);
 		}
 	}
 
@@ -267,14 +261,12 @@ public class ImportServiceImpl implements ImportService {
 		try {
 			ObjectSchema schema = schemaFactory.getSchema(schemaCriteria.getObjectType(), schemaCriteria.getParams());
 			if (schema == null) {
-				AppException.userError(ImportJobErrorCode.OBJ_SCHEMA_NOT_FOUND, schemaCriteria.getObjectType());
+				throw AppException.userError(ImportJobErrorCode.OBJ_SCHEMA_NOT_FOUND, schemaCriteria.getObjectType());
 			}
 
 			return ObjectReader.getSchemaFields(schema);
-		} catch (AppException ae) {
-			throw ae;
 		} catch (Exception e) {
-			throw AppException.serverError(e);
+			return AppException.raiseError(e);
 		}
 	}
 
@@ -302,10 +294,8 @@ public class ImportServiceImpl implements ImportService {
 			}
 
 			return records;
-		} catch (AppException ae) {
-			throw ae;
 		} catch (Exception e) {
-			throw AppException.serverError(e);
+			return AppException.raiseError(e);
 		} finally {
 			IOUtils.closeQuietly(reader);
 			if (file != null) {
@@ -634,6 +624,9 @@ public class ImportServiceImpl implements ImportService {
 					}
 				} catch (Exception e) {
 					errMsg = e.getMessage();
+					if (errMsg == null) {
+						errMsg = e.getClass().getName();
+					}
 				}
 				
 				String key = objReader.getRowKey();
@@ -643,11 +636,17 @@ public class ImportServiceImpl implements ImportService {
 					mergedObj.setKey(key);
 					mergedObj.setObject(parsedObj);
 				}
-				
-				mergedObj.addErrMsg(errMsg);
+
+				if (errMsg != null) {
+					//
+					// mark the object as processed whenever an error message is encountered.
+					//
+					mergedObj.addErrMsg(errMsg);
+					mergedObj.setProcessed(true);
+				}
+
 				mergedObj.addRow(objReader.getCsvRow());
 				mergedObj.merge(parsedObj);
-
 				objectsMap.put(key, mergedObj);
 			}
 
@@ -709,8 +708,10 @@ public class ImportServiceImpl implements ImportService {
 				);
 
 				if (atomic) {
-					sessionFactory.getCurrentSession().flush();
-					sessionFactory.getCurrentSession().clear();
+					//
+					// Let's give a clean session for every object to be imported
+					//
+					clearSession();
 				}
 
 				return StringUtils.EMPTY;
@@ -767,6 +768,28 @@ public class ImportServiceImpl implements ImportService {
 				callback.success(job, totalRecords, failedRecords);
 			} else {
 				callback.fail(job, totalRecords, failedRecords);
+			}
+		}
+
+		private void clearSession() {
+			try {
+				sessionFactory.getCurrentSession().flush();
+			} catch (Exception e) {
+				//
+				// Oops, we encountered error. This happens when we've received database errors
+				// like data truncation error, unique constraint etc ... We can't do much except
+				// log and move forward
+				//
+				logger.info("Error flushing the database session", e);
+			} finally {
+				try {
+					sessionFactory.getCurrentSession().clear();
+				} catch (Exception e) {
+					//
+					// Something severely wrong...
+					//
+					logger.error("Error cleaning the database session", e);
+				}
 			}
 		}
 	}
